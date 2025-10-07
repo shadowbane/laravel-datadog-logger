@@ -125,7 +125,31 @@ class DataDogApiHandler extends AbstractProcessingHandler
             $body['message'] = get_class($exception);
         }
 
+        // Add log context as custom attributes, excluding specific keys
+        $context = $this->filterContext($record->context);
+        if (!empty($context)) {
+            $body = array_merge($body, $context);
+        }
+
         return $body;
+    }
+
+    /**
+     * Filter log context to exclude specific keys that are handled separately.
+     *
+     * @param array $context
+     *
+     * @return array
+     */
+    private function filterContext(array $context): array
+    {
+        $excludedKeys = ['exception', 'message', 'messages'];
+
+        return array_filter(
+            $context,
+            fn($key) => !in_array($key, $excludedKeys),
+            ARRAY_FILTER_USE_KEY
+        );
     }
 
     /**
