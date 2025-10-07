@@ -4,16 +4,16 @@ namespace Shadowbane\DatadogLogger\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Throwable;
+use Exception;
 
-class TestException extends \Exception
+class TestException extends Exception
 {
     /**
      * @param string  $message
      * @param int  $code
      * @param Throwable|null  $previous
      */
-    public function __construct(string $message = "", int $code = 0, Throwable $previous = null)
+    public function __construct(string $message = "", int $code = 0, ?Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
     }
@@ -39,6 +39,7 @@ class SendException extends Command
             Log::channel('datadog-api')
                 ->error($e->getMessage(), [
                     'exception' => $e,
+                    'test' => 'data',
                 ]);
             $this->error($e->getMessage());
         }
