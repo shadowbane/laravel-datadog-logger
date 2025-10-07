@@ -117,6 +117,8 @@ class DataDogApiHandler extends AbstractProcessingHandler
             $body['error.kind'] = $exception->getCode();
             $body['error.message'] = $exception->getMessage();
             $body['error.stack'] = $exception->getTraceAsString();
+            $body['error.file'] = $exception->getFile();
+            $body['error.line'] = $exception->getLine();
 
             // replace message with exception class
             $body['message'] = get_class($exception);
@@ -133,6 +135,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
 
     /**
      * Filter log context to exclude specific keys that are handled separately.
+     * Flattens nested arrays using dot notation for DataDog compatibility.
      *
      * @param  array  $context
      * @return array
@@ -141,11 +144,42 @@ class DataDogApiHandler extends AbstractProcessingHandler
     {
         $excludedKeys = ['exception', 'message', 'messages'];
 
-        return array_filter(
+        $filtered = array_filter(
             $context,
             fn($key) => ! in_array($key, $excludedKeys),
             ARRAY_FILTER_USE_KEY
         );
+
+        return $this->flattenArray($filtered);
+    }
+
+    /**
+     * Flatten a nested array using dot notation.
+     *
+     * @param  array  $array
+     * @param  string  $prefix
+     * @return array
+     */
+    private function flattenArray(array $array, string $prefix = ''): array
+    {
+        $result = [];
+
+        foreach ($array as $key => $value) {
+            $newKey = $prefix === '' ? $key : $prefix.'.'.$key;
+
+            if (is_array($value) && ! empty($value)) {
+                $result = array_merge($result, $this->flattenArray($value, $newKey));
+            } elseif (is_object($value)) {
+                // Convert objects to string representation
+                $result[$newKey] = method_exists($value, '__toString')
+                    ? (string) $value
+                    : get_class($value);
+            } else {
+                $result[$newKey] = $value;
+            }
+        }
+
+        return $result;
     }
 
     /**
