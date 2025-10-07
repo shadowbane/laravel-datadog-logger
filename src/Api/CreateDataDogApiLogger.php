@@ -14,7 +14,7 @@ class CreateDataDogApiLogger
     /**
      * Create the DataDog Api Logger.
      *
-     * @param array $config
+     * @param  array  $config
      *
      * @throws ApiKeyNotFoundException
      * @throws MissingExtensionException
@@ -24,7 +24,7 @@ class CreateDataDogApiLogger
     public function __invoke(array $config): Logger
     {
         if (empty($config['apiKey'])) {
-            throw new ApiKeyNotFoundException();
+            throw new ApiKeyNotFoundException;
         }
         $dataDogHandler = new DataDogApiHandler(
             $config['apiKey'],

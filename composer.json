@@ -1,48 +1,48 @@
 {
-  "name": "shadowbane/laravel-datadog-logger",
-  "type": "library",
-  "description": "Custom laravel monolog logger for datadog logs management, both api and agent ways",
-  "keywords": [
-    "php",
-    "laravel",
-    "datadog",
-    "log",
-    "agent",
-    "datadogagent",
-    "datadoglog",
-    "management",
-    "datadog-logger",
-    "api",
-    "monolog",
-    "logger",
-    "handler",
-    "formatter"
-  ],
-  "homepage": "https://github.com/shadowbane/laravel-datadog-logger",
-  "license": "MIT",
-  "require": {
-    "php": "^8.1 || ^8.2 || ^8.3",
-    "ext-json": "*",
-    "guzzlehttp/guzzle": "^6.0 || ^7.0",
-    "monolog/monolog": "^3.0"
-  },
-  "require-dev": {
-    "orchestra/testbench": "^8.0",
-    "phpstan/phpstan": "^1.8"
-  },
-  "extra": {
-    "laravel": {
-      "providers": [
-        "Shadowbane\\DatadogLogger\\Providers\\DataDogServiceProvider"
-      ]
+    "name": "shadowbane/laravel-datadog-logger",
+    "type": "library",
+    "description": "Custom laravel monolog logger for datadog logs management, both api and agent ways",
+    "keywords": [
+        "php",
+        "laravel",
+        "datadog",
+        "log",
+        "agent",
+        "datadogagent",
+        "datadoglog",
+        "management",
+        "datadog-logger",
+        "api",
+        "monolog",
+        "logger",
+        "handler",
+        "formatter"
+    ],
+    "homepage": "https://github.com/shadowbane/laravel-datadog-logger",
+    "license": "MIT",
+    "require": {
+        "php": "^8.1 || ^8.2 || ^8.3",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^6.0 || ^7.0",
+        "monolog/monolog": "^3.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0",
+        "phpstan/phpstan": "^1.8"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Shadowbane\\DatadogLogger\\Providers\\DataDogServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "autoload": {
+        "psr-4": {
+            "Shadowbane\\DatadogLogger\\": "src/"
+        }
     }
-  },
-  "config": {
-    "sort-packages": true
-  },
-  "autoload": {
-    "psr-4": {
-      "Shadowbane\\DatadogLogger\\": "src/"
-    }
-  }
 }

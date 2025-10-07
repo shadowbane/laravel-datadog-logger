@@ -2,18 +2,18 @@
 
 namespace Shadowbane\DatadogLogger\Commands;
 
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class TestException extends Exception
 {
     /**
-     * @param string  $message
-     * @param int  $code
-     * @param Throwable|null  $previous
+     * @param  string  $message
+     * @param  int  $code
+     * @param  Throwable|null  $previous
      */
-    public function __construct(string $message = "", int $code = 0, ?Throwable $previous = null)
+    public function __construct(string $message = '', int $code = 0, ?Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
     }
@@ -22,7 +22,6 @@ class TestException extends Exception
 class SendException extends Command
 {
     protected $name = 'datadog:send-test-exception';
-
     protected $description = 'Test sending exception to datadog logger via API';
 
     /**
@@ -30,10 +29,10 @@ class SendException extends Command
      *
      * @throws TestException
      */
-    public function handle() : void
+    public function handle(): void
     {
         try {
-            throw new TestException('This is test exception. Sent at: ' . date('Y-m-d H:i:s'), 500);
+            throw new TestException('This is test exception. Sent at: '.date('Y-m-d H:i:s'), 500);
         } catch (TestException $e) {
             // We catch the log, to prevent showing stacktrace on console, as this exception is expected.
             Log::channel('datadog-api')

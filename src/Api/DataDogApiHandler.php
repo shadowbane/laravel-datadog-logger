@@ -22,15 +22,15 @@ class DataDogApiHandler extends AbstractProcessingHandler
     protected string $token;
 
     /**
-     * @param string $token API token supplied by DataDog
-     * @param string|int $level The minimum logging level to trigger this handler
-     * @param bool $bubble whether or not messages that are handled should bubble up the stack
+     * @param  string  $token  API token supplied by DataDog
+     * @param  string|int  $level  The minimum logging level to trigger this handler
+     * @param  bool  $bubble  whether or not messages that are handled should bubble up the stack
      *
      * @throws MissingExtensionException If the curl extension is missing
      */
     public function __construct(string $token, $level = Logger::WARNING, bool $bubble = true)
     {
-        if (!extension_loaded('curl')) {
+        if (! extension_loaded('curl')) {
             throw new MissingExtensionException('The curl extension is needed to use the DataDogApiHandler');
         }
         $this->token = $token;
@@ -50,8 +50,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
     /**
      * Write implementation of AbstractProcessingHandler.
      *
-     * @param LogRecord $record
-     *
+     * @param  LogRecord  $record
      * @return void
      */
     protected function write(LogRecord $record): void
@@ -62,14 +61,13 @@ class DataDogApiHandler extends AbstractProcessingHandler
     /**
      * Send the log.
      *
-     * @param LogRecord $record
-     *
+     * @param  LogRecord  $record
      * @return void
      */
     protected function send(LogRecord $record): void
     {
         try {
-            $client = new Client();
+            $client = new Client;
             $client->request(
                 'POST',
                 $this->getEndpoint(),
@@ -98,8 +96,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
      * Create the body of the log to send
      * to DataDog via the API.
      *
-     * @param LogRecord $record
-     *
+     * @param  LogRecord  $record
      * @return array
      */
     private function createBody(LogRecord $record): array
@@ -114,7 +111,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
             'timestamp' => now()->getPreciseTimestamp(3),
         ];
 
-        if (!blank($record->context) && isset($record->context['exception']) && $record->context['exception'] instanceof \Exception) {
+        if (! blank($record->context) && isset($record->context['exception']) && $record->context['exception'] instanceof \Exception) {
             /** @var \Exception $exception */
             $exception = $record->context['exception'];
             $body['error.kind'] = $exception->getCode();
@@ -127,7 +124,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
 
         // Add log context as custom attributes, excluding specific keys
         $context = $this->filterContext($record->context);
-        if (!empty($context)) {
+        if (! empty($context)) {
             $body = array_merge($body, $context);
         }
 
@@ -137,8 +134,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
     /**
      * Filter log context to exclude specific keys that are handled separately.
      *
-     * @param array $context
-     *
+     * @param  array  $context
      * @return array
      */
     private function filterContext(array $context): array
@@ -147,7 +143,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
 
         return array_filter(
             $context,
-            fn($key) => !in_array($key, $excludedKeys),
+            fn($key) => ! in_array($key, $excludedKeys),
             ARRAY_FILTER_USE_KEY
         );
     }
@@ -170,8 +166,7 @@ class DataDogApiHandler extends AbstractProcessingHandler
     /**
      * Translate Laravel error to DataDog error.
      *
-     * @param Level $status
-     *
+     * @param  Level  $status
      * @return string
      */
     private function getLogStatus(Level $status): string
