@@ -111,17 +111,26 @@ class DataDogApiHandler extends AbstractProcessingHandler
             'timestamp' => now()->getPreciseTimestamp(3),
         ];
 
-        if (! blank($record->context) && isset($record->context['exception']) && $record->context['exception'] instanceof \Exception) {
-            /** @var \Exception $exception */
-            $exception = $record->context['exception'];
-            $body['error.kind'] = $exception->getCode();
-            $body['error.message'] = $exception->getMessage();
-            $body['error.stack'] = $exception->getTraceAsString();
-            $body['error.file'] = $exception->getFile();
-            $body['error.line'] = $exception->getLine();
+        $throwable = $record->context['exception'] ?? null;
 
-            // replace message with exception class
-            $body['message'] = get_class($exception);
+        // \Throwable, not \Exception: PHP's Error hierarchy (TypeError, ValueError,
+        // ArgumentCountError) does not extend Exception, so fatals used to reach
+        // DataDog with no error.* attributes at all.
+        if ($throwable instanceof \Throwable) {
+            // error.kind is DataDog's error TYPE, which is the class — getCode() is
+            // usually 0 and never groups usefully.
+            $body['error.kind'] = get_class($throwable);
+            $body['error.message'] = $throwable->getMessage();
+            $body['error.stack'] = $this->formatThrowable($throwable);
+            $body['error.file'] = $throwable->getFile();
+            $body['error.line'] = $throwable->getLine();
+
+            // Keep a readable body. Grouping by exception class is what
+            // `@error.kind` is for, so the class name no longer displaces the
+            // message here.
+            $body['message'] = $throwable->getMessage() !== ''
+                ? $throwable->getMessage()
+                : get_class($throwable);
         }
 
         // Add log context as custom attributes, excluding specific keys
@@ -131,6 +140,43 @@ class DataDogApiHandler extends AbstractProcessingHandler
         }
 
         return $body;
+    }
+
+    /**
+     * Render a throwable and every throwable it wraps.
+     *
+     * getTraceAsString() describes only the outermost throwable, so when an
+     * exception wraps another the cause never reaches DataDog. The whole chain is
+     * rendered, in full — deciding which frames matter is the reader's job, not
+     * this handler's.
+     *
+     * @param  \Throwable  $throwable
+     * @return string
+     */
+    private function formatThrowable(\Throwable $throwable): string
+    {
+        $parts = [];
+
+        // Termination guard only. A `previous` cycle cannot occur through normal
+        // construction, and this drops nothing that a linear chain would report.
+        $seen = new \SplObjectStorage;
+
+        do {
+            $seen->attach($throwable);
+
+            $parts[] = sprintf(
+                "%s: %s in %s:%d\n%s",
+                get_class($throwable),
+                $throwable->getMessage(),
+                $throwable->getFile(),
+                $throwable->getLine(),
+                $throwable->getTraceAsString()
+            );
+
+            $throwable = $throwable->getPrevious();
+        } while ($throwable !== null && ! $seen->contains($throwable));
+
+        return implode("\n\nCaused by: ", $parts);
     }
 
     /**

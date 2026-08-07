@@ -1,7 +1,7 @@
 {
     "name": "shadowbane/laravel-datadog-logger",
     "type": "library",
-    "description": "Custom laravel monolog logger for datadog logs management, both api and agent ways",
+    "description": "Custom Laravel monolog logger for DataDog logs management via API",
     "keywords": [
         "php",
         "laravel",

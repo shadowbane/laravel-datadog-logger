@@ -108,10 +108,26 @@ try {
 ```
 
 The logger will automatically extract:
-- Exception class name (becomes the message)
-- Error code (`error.kind`)
+- Exception message (becomes the message; falls back to the class name when the exception carries no message)
+- Exception class (`error.kind`) — group by `@error.kind` in DataDog
 - Error message (`error.message`)
-- Stack trace (`error.stack`)
+- Stack trace (`error.stack`), including the full `getPrevious()` chain
+- Source location (`error.file`, `error.line`)
+
+Anything implementing `Throwable` is handled, so PHP's `Error` hierarchy
+(`TypeError`, `ValueError`, `ArgumentCountError`) is captured alongside `Exception`.
+
+Wrapped exceptions are rendered in full, separated by `Caused by:`. This matters
+because the outermost exception is often a generic wrapper, while the detail that
+identifies the failure lives in the cause:
+
+```
+RuntimeException: Unable to complete request in /app/src/Client.php:88
+#0 …
+
+Caused by: PDOException: SQLSTATE[HY000] [2002] Connection refused in /app/src/Db.php:31
+#0 …
+```
 
 ### Log Context
 
@@ -164,16 +180,17 @@ Logs sent to DataDog include the following fields:
 - `ddsource`: Always set to `laravel`
 - `ddtags`: Environment tag (e.g., `env:production`)
 - `hostname`: Server hostname
-- `message`: Formatted log message (or exception class name)
+- `message`: Formatted log message (or the exception message when one is present)
 - `service`: Your Laravel application name (from `config('app.name')`)
 - `status`: Mapped log level (info, warn, error)
 - `timestamp`: Log timestamp in milliseconds
 - Custom attributes from log context
 
-For exceptions:
-- `error.kind`: Exception code
+For throwables:
+- `error.kind`: Exception class
 - `error.message`: Exception message
-- `error.stack`: Exception stack trace
+- `error.stack`: Stack trace, including the `Caused by:` chain
+- `error.file` / `error.line`: Where it was thrown
 
 ## Development
 
