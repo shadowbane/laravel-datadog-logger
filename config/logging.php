@@ -13,6 +13,13 @@ return [
         'level' => env('DATADOG_LEVEL', 'warning'),
         'bubble' => env('DATADOG_BUBBLE', true),
 
+        // Buffer records and send them in batches after the response, instead
+        // of one blocking HTTP request per log line.
+        'buffer' => env('DATADOG_BUFFER', true),
+
+        // Seconds to wait for DataDog (connect and total) before giving up.
+        'timeout' => env('DATADOG_TIMEOUT', 2),
+
         /*
         |--------------------------------------------------------------------------
         | Error Reporting

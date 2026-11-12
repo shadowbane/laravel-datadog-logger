@@ -7,6 +7,7 @@ A custom Laravel Monolog logger for sending logs to DataDog via their HTTP API.
 ## Features
 
 - Send Laravel logs directly to DataDog via HTTP API
+- Non-blocking by default: logs are batched and sent after the response
 - Automatic exception tracking with stack traces
 - Custom log context support
 - Configurable log levels and endpoints
@@ -19,7 +20,7 @@ A custom Laravel Monolog logger for sending logs to DataDog via their HTTP API.
 - Laravel 10.x or higher
 - ext-json
 - ext-curl
-- Guzzle ^6.0 || ^7.0
+- Guzzle ^6.0 || ^7.0 || ^8.0
 - Monolog ^3.0
 
 ## Installation
@@ -45,6 +46,8 @@ DATADOG_BUBBLE=true
 DATADOG_ENVIRONMENT=production
 DATADOG_API_ENDPOINT=https://http-intake.logs.datadoghq.com/api/v2/logs
 DATADOG_ERROR_LOG_CHANNEL=stack
+DATADOG_BUFFER=true
+DATADOG_TIMEOUT=2
 ```
 
 #### Configuration Options
@@ -57,6 +60,19 @@ DATADOG_ERROR_LOG_CHANNEL=stack
 | `DATADOG_ENVIRONMENT` | Environment tag for DataDog | Laravel's `app()->environment()` |
 | `DATADOG_API_ENDPOINT` | DataDog logs API endpoint | `https://http-intake.logs.datadoghq.com/api/v2/logs` |
 | `DATADOG_ERROR_LOG_CHANNEL` | Laravel log channel for logging DataDog API failures | `false` |
+| `DATADOG_BUFFER` | Batch logs and send them after the response instead of one blocking request per log line | `true` |
+| `DATADOG_TIMEOUT` | Seconds to wait for DataDog (connect and total) before giving up | `2` |
+
+### How logs are delivered
+
+With `DATADOG_BUFFER=true` (the default), log calls return immediately. Records are held in memory and sent in one batch request:
+
+- **HTTP (php-fpm):** at shutdown, after the response has been sent to the client, so users never wait on DataDog.
+- **Queue workers:** after each job (`JobProcessed`, `JobExceptionOccurred`, `JobFailed`), because a worker process does not shut down between jobs.
+- **Console commands:** when the command terminates.
+- **Large requests:** early, once 1000 records are buffered.
+
+Batches are split to stay within DataDog's limits of 1000 entries and 5MB per request. Records still in memory when a process is hard-killed (`SIGKILL`, out-of-memory) are lost; set `DATADOG_BUFFER=false` to send each record synchronously as it is logged.
 
 ### Laravel Logging Configuration
 
@@ -191,6 +207,7 @@ For throwables:
 - `error.message`: Exception message
 - `error.stack`: Stack trace, including the `Caused by:` chain
 - `error.file` / `error.line`: Where it was thrown
+- `logger.message`: The message the application passed to the logger, when it differs from the exception message (e.g. `Log::error('Charge failed for invoice #123', ['exception' => $e])`). Search it with `@logger.message:*invoice*`.
 
 ## Development
 

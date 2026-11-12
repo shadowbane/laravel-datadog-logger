@@ -16,6 +16,12 @@ use Monolog\LogRecord;
  */
 class DataDogApiHandler extends AbstractProcessingHandler
 {
+    /** DataDog accepts at most 1000 entries per request. */
+    private const MAX_ENTRIES_PER_PAYLOAD = 1000;
+
+    /** DataDog accepts at most 5MB (uncompressed) per request. */
+    private const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024;
+
     /** @var string */
     protected string $token;
 
@@ -53,17 +59,84 @@ class DataDogApiHandler extends AbstractProcessingHandler
      */
     protected function write(LogRecord $record): void
     {
-        $this->send($record);
+        $this->send([$record]);
     }
 
     /**
-     * Send the log.
+     * Process, format and send several records at once.
      *
-     * @param  LogRecord  $record
+     * BufferHandler calls this when it flushes, so a buffered request costs
+     * one POST per batch instead of one per log line.
+     *
+     * @param  LogRecord[]  $records
      * @return void
      */
-    protected function send(LogRecord $record): void
+    public function handleBatch(array $records): void
     {
+        $formatted = [];
+        foreach ($records as $record) {
+            if (! $this->isHandling($record)) {
+                continue;
+            }
+            if (\count($this->processors) > 0) {
+                $record = $this->processRecord($record);
+            }
+            $record->formatted = $this->getFormatter()->format($record);
+            $formatted[] = $record;
+        }
+
+        if ($formatted !== []) {
+            $this->send($formatted);
+        }
+    }
+
+    /**
+     * Send records to DataDog, split into payloads that stay within the
+     * API's per-request limits.
+     *
+     * @param  LogRecord[]  $records
+     * @return void
+     */
+    protected function send(array $records): void
+    {
+        $chunk = [];
+        $chunkBytes = 2; // the enclosing "[" and "]"
+
+        foreach ($records as $record) {
+            $entry = json_encode($this->createBody($record), JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($entry === false) {
+                $this->reportFailure('Unable to JSON-encode a log record for DataDog: '.json_last_error_msg());
+
+                continue;
+            }
+
+            $entryBytes = \strlen($entry) + 1; // plus the separating comma
+            if ($chunk !== [] && (\count($chunk) >= self::MAX_ENTRIES_PER_PAYLOAD
+                || $chunkBytes + $entryBytes > self::MAX_PAYLOAD_BYTES)) {
+                $this->post($chunk);
+                $chunk = [];
+                $chunkBytes = 2;
+            }
+
+            $chunk[] = $entry;
+            $chunkBytes += $entryBytes;
+        }
+
+        if ($chunk !== []) {
+            $this->post($chunk);
+        }
+    }
+
+    /**
+     * POST one payload of already-encoded log entries.
+     *
+     * @param  string[]  $entries
+     * @return void
+     */
+    private function post(array $entries): void
+    {
+        $timeout = (float) config('logging.channels.datadog-api.timeout', 2);
+
         try {
             $client = new Client;
             $client->request(
@@ -75,18 +148,30 @@ class DataDogApiHandler extends AbstractProcessingHandler
                         'DD-API-KEY' => $this->token,
                         'Accept-Encoding' => 'gzip',
                     ],
-                    'body' => json_encode($this->createBody($record)),
+                    'body' => '['.implode(',', $entries).']',
+                    'timeout' => $timeout,
+                    'connect_timeout' => $timeout,
                 ]
             );
         } catch (GuzzleException $e) {
-            $errLoggingChannel = config('logging.channels.datadog-api.error');
-            if ($errLoggingChannel) {
-                Log::channel($errLoggingChannel)->critical($e->getMessage(), [
-                    'exception' => $e,
-                ]);
-            }
+            $this->reportFailure($e->getMessage(), $e);
+        }
+    }
 
-            return;
+    /**
+     * Report a failure to deliver logs to the configured error channel, if any.
+     *
+     * @param  string  $message
+     * @param  \Throwable|null  $exception
+     * @return void
+     */
+    private function reportFailure(string $message, ?\Throwable $exception = null): void
+    {
+        $errLoggingChannel = config('logging.channels.datadog-api.error');
+        if ($errLoggingChannel) {
+            Log::channel($errLoggingChannel)->critical($message, $exception ? [
+                'exception' => $exception,
+            ] : []);
         }
     }
 
@@ -106,7 +191,9 @@ class DataDogApiHandler extends AbstractProcessingHandler
             'message' => $record->formatted,
             'service' => config('app.name'),
             'status' => $this->getLogStatus($record->level),
-            'timestamp' => now()->getPreciseTimestamp(3),
+            // When the record was logged, not when it was sent: buffered records
+            // are sent together at the end of the request.
+            'timestamp' => (int) $record->datetime->format('Uv'),
         ];
 
         $throwable = $record->context['exception'] ?? null;
@@ -129,6 +216,15 @@ class DataDogApiHandler extends AbstractProcessingHandler
             $body['message'] = $throwable->getMessage() !== ''
                 ? $throwable->getMessage()
                 : get_class($throwable);
+
+            // The text the application passed to the logger would otherwise be
+            // lost. It is kept as-is, unformatted (the formatted line would dump
+            // the whole exception), and only when it adds something: Laravel's
+            // exception handler logs the exception message itself.
+            $logged = trim($record->message);
+            if ($logged !== '' && $logged !== $throwable->getMessage()) {
+                $body['logger.message'] = $record->message;
+            }
         }
 
         // Add log context as custom attributes, excluding specific keys
