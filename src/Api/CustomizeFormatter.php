@@ -3,6 +3,8 @@
 namespace Shadowbane\DatadogLogger\Api;
 
 use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\FormattableHandlerInterface;
+use Monolog\Logger;
 
 class CustomizeFormatter
 {
@@ -14,7 +16,16 @@ class CustomizeFormatter
      */
     public function __invoke($logger)
     {
-        foreach ($logger->getHandlers() as $handler) {
+        $monolog = $logger->getLogger();
+        if (! $monolog instanceof Logger) {
+            return;
+        }
+
+        foreach ($monolog->getHandlers() as $handler) {
+            if (! $handler instanceof FormattableHandlerInterface) {
+                continue;
+            }
+
             $handler->setFormatter(new LineFormatter(
                 '%channel%.%level_name%: %message%\ncontext: %context%\nextra: %extra%'
             ));

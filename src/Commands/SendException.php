@@ -5,6 +5,7 @@ namespace Shadowbane\DatadogLogger\Commands;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class TestException extends Exception
 {

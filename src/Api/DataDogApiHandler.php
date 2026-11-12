@@ -13,8 +13,6 @@ use Monolog\LogRecord;
 
 /**
  * Class DataDogApiHandler.
- *
- * @extends AbstractProcessingHandler
  */
 class DataDogApiHandler extends AbstractProcessingHandler
 {

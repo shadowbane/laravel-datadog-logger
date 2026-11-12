@@ -6,8 +6,6 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Class DataDogServiceProvider.
- *
- * @extends ServiceProvider
  */
 class DataDogServiceProvider extends ServiceProvider
 {
